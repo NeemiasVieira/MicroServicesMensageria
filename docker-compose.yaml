@@ -1,0 +1,65 @@
+version: '2'
+
+networks:
+  net:
+    name: net
+    driver: bridge
+
+services:
+  zookeeper:
+    image: wurstmeister/zookeeper
+    networks:
+      - net
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: wurstmeister/kafka
+    networks:
+      - net
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    links:
+      - zookeeper
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+    
+  api-rest:
+    networks:
+        - net
+    build:
+      context: ./mensageria-api
+      dockerfile: Dockerfile 
+    ports:
+      - "8080:8080"
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+
+  api-graphql:
+    networks:
+      - net
+    build:
+      context: ./api-graphql
+      dockerfile: Dockerfile 
+    ports:
+      - "3333:3333"
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      MONGODB_HOST: mongodb://mongodb:27017/apigraphql
+
+  mongodb:
+    image: mongo
+    networks:
+      - net
+    container_name: mongodb
+    ports:
+      - "27017:27017"
